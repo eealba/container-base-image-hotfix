@@ -1,0 +1,61 @@
+==> Preparando registry local en 127.0.0.1:5000
+==> Compilando App.java una sola vez en un contenedor JDK 21
+==> Copiando las bases al registry local
+21.0.1_12-jre-alpine: Pulling from library/eclipse-temurin
+Digest: sha256:9a21ac97b76e52f4b58d5d6c7fdd459cd600cce8724a31fc0a2b4346b35bced2
+Status: Image is up to date for eclipse-temurin:21.0.1_12-jre-alpine
+docker.io/library/eclipse-temurin:21.0.1_12-jre-alpine
+The push refers to repository [127.0.0.1:5000/base-vieja]
+80f9f010fdd7: Layer already exists
+c926b61bad3b: Layer already exists
+e5820a814e8c: Layer already exists
+7eb0e0966f8c: Layer already exists
+c432e8ceb055: Layer already exists
+21: digest: sha256:98963ed09c4fd82e128c6cc9e64d71798239b824164276626d79b8f9e666ac0e size: 1366
+
+ Info -> Not all multiplatform-content is present and only the available single-platform image was pushed
+         sha256:9a21ac97b76e52f4b58d5d6c7fdd459cd600cce8724a31fc0a2b4346b35bced2 -> sha256:98963ed09c4fd82e128c6cc9e64d71798239b824164276626d79b8f9e666ac0e
+21-jre-alpine: Pulling from library/eclipse-temurin
+Digest: sha256:5d7689f47d670aca766b9503a70bccc2d73b4eb9221ae8f714ae958313c4ce70
+Status: Image is up to date for eclipse-temurin:21-jre-alpine
+docker.io/library/eclipse-temurin:21-jre-alpine
+The push refers to repository [127.0.0.1:5000/base-nueva]
+7c3a5aabfc1c: Layer already exists
+2db787ed6893: Layer already exists
+881fc932939e: Layer already exists
+cb99678e5a4c: Layer already exists
+89406ef15e50: Layer already exists
+21: digest: sha256:c788d7d9ddc1cf0cf38a1735e14792eb2ff4dc6886e9658771095b7e36a69523 size: 1945
+
+ Info -> Not all multiplatform-content is present and only the available single-platform image was pushed
+         sha256:5d7689f47d670aca766b9503a70bccc2d73b4eb9221ae8f714ae958313c4ce70 -> sha256:c788d7d9ddc1cf0cf38a1735e14792eb2ff4dc6886e9658771095b7e36a69523
+==> Construyendo y ejecutando la imagen original
+The push refers to repository [127.0.0.1:5000/mi-microservicio]
+faba159acacd: Layer already exists
+e5820a814e8c: Layer already exists
+7eb0e0966f8c: Layer already exists
+c432e8ceb055: Layer already exists
+80f9f010fdd7: Layer already exists
+c926b61bad3b: Layer already exists
+1.0.0: digest: sha256:01615a8df4afb3ee179d6a8ad4aaa8fb93bc5a373537ae0c3a71af2c429879a3 size: 1483
+
+Antes:
+java.version=21.0.1
+java.vendor=Eclipse Adoptium
+os.name=Linux
+4d8fbfa905aae71d28df7a8bd4d1a5d4ca4995e3540528091d8036848a24a1cb  /app/App.class
+==> Aplicando crane rebase sin recompilar la aplicación
+127.0.0.1:5000/mi-microservicio@sha256:26df77f17b792dfc50ea5b7e435ebd4696ccb70349178fb394e995b8f3c2e4ec
+1.0.0-patched: Pulling from mi-microservicio
+Digest: sha256:26df77f17b792dfc50ea5b7e435ebd4696ccb70349178fb394e995b8f3c2e4ec
+Status: Image is up to date for 127.0.0.1:5000/mi-microservicio:1.0.0-patched
+127.0.0.1:5000/mi-microservicio:1.0.0-patched
+
+Después:
+java.version=21.0.13.1
+java.vendor=Eclipse Adoptium
+os.name=Linux
+4d8fbfa905aae71d28df7a8bd4d1a5d4ca4995e3540528091d8036848a24a1cb  /app/App.class
+
+Validación correcta: JVM actualizada y SHA256 de App.class idéntico.
+Limpieza del registry y sus datos: docker rm -fv jvm-rebase-poc-registry

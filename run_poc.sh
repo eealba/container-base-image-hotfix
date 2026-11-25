@@ -4,7 +4,7 @@ set -Eeuo pipefail
 trap 'echo "Error en la POC (línea $LINENO)." >&2' ERR
 
 registry_container="jvm-rebase-poc-registry"
-registry="localhost:5000"
+registry="127.0.0.1:5000"
 old_upstream="eclipse-temurin:21.0.1_12-jre-alpine"
 new_upstream="eclipse-temurin:21-jre-alpine"
 jdk="eclipse-temurin:21-jdk-alpine"
@@ -15,17 +15,73 @@ patched="$registry/mi-microservicio:1.0.0-patched"
 
 case "$(uname -s)" in
   Darwin)
-    if ! command -v brew >/dev/null 2>&1; then
-      echo "Instala Homebrew siguiendo https://brew.sh/ y vuelve a ejecutar el script." >&2
+    brew_can_install=false
+    if command -v brew >/dev/null 2>&1; then
+      if brew_prefix="$(brew --prefix 2>/dev/null)"; then
+        brew_libexec="$brew_prefix/libexec"
+        if [ ! -d "$brew_libexec" ] || [ -w "$brew_libexec" ]; then
+          brew_can_install=true
+        fi
+      fi
+    fi
+
+    if ! command -v crane >/dev/null 2>&1 && [ "$brew_can_install" = true ]; then
+      brew install crane || echo "Homebrew no pudo instalar crane; se probará MacPorts." >&2
+    fi
+    if ! command -v docker >/dev/null 2>&1 && [ "$brew_can_install" = true ]; then
+      brew install docker || echo "Homebrew no pudo instalar docker; se probará MacPorts." >&2
+    fi
+    if ! docker info >/dev/null 2>&1 && ! command -v colima >/dev/null 2>&1 && [ "$brew_can_install" = true ]; then
+      brew install colima || echo "Homebrew no pudo instalar colima; se probará MacPorts." >&2
+    fi
+
+    macports_packages=()
+    if ! command -v crane >/dev/null 2>&1 && ! command -v go >/dev/null 2>&1; then
+      macports_packages+=(go)
+    fi
+    if ! command -v docker >/dev/null 2>&1; then
+      macports_packages+=(docker)
+    fi
+    if ! docker info >/dev/null 2>&1 && ! command -v colima >/dev/null 2>&1; then
+      macports_packages+=(colima)
+    fi
+
+    if [ "${#macports_packages[@]}" -gt 0 ]; then
+      if ! command -v port >/dev/null 2>&1; then
+        echo "Faltan dependencias y Homebrew no puede instalarlas. Instala MacPorts para tu versión de macOS desde https://www.macports.org/install.php y vuelve a ejecutar la POC." >&2
+        exit 1
+      fi
+      echo "==> Instalando dependencias con MacPorts (sin cambiar propietarios de Homebrew)"
+      sudo -A port selfupdate
+      sudo -A port install "${macports_packages[@]}"
+      hash -r
+    fi
+
+    if ! command -v crane >/dev/null 2>&1; then
+      go_bin="$(go env GOBIN)"
+      if [ -z "$go_bin" ]; then
+        go_bin="$(go env GOPATH)/bin"
+      fi
+      if ! go install github.com/google/go-containerregistry/cmd/crane@latest; then
+        echo "No se pudo instalar crane con Go." >&2
+        exit 1
+      fi
+      export PATH="$go_bin:$PATH"
+    fi
+    if ! command -v docker >/dev/null 2>&1; then
+      echo "No se encontró el comando docker después de instalar las dependencias." >&2
       exit 1
     fi
-    for package in crane colima docker; do
-      if ! command -v "$package" >/dev/null 2>&1; then
-        brew install "$package"
-      fi
-    done
+
     if ! docker info >/dev/null 2>&1; then
-      colima start
+      if ! command -v colima >/dev/null 2>&1; then
+        echo "Docker no tiene un daemon activo y Colima no está instalado." >&2
+        exit 1
+      fi
+      if ! colima start; then
+        echo "No se pudo iniciar Colima." >&2
+        exit 1
+      fi
     fi
     ;;
   Linux)
@@ -81,7 +137,7 @@ while [ "$attempt" -lt 10 ]; do
   sleep 1
 done
 if [ "$ready" != true ]; then
-  echo "El registry no responde en localhost:5000; revisa el contenedor y el puerto." >&2
+  echo "El registry no responde en 127.0.0.1:5000; revisa el contenedor y el puerto." >&2
   exit 1
 fi
 
@@ -115,7 +171,7 @@ ENTRYPOINT ["java", "-cp", "/app", "App"]
 EOF
 
 echo "==> Construyendo y ejecutando la imagen original"
-docker build --pull -t "$original" "$workdir"
+docker build --pull --provenance=false -t "$original" "$workdir"
 docker push "$original"
 before="$(docker run --rm "$original")"
 before_hash="$(docker run --rm --entrypoint sha256sum "$original" /app/App.class)"
